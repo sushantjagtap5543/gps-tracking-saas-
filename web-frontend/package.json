@@ -1,0 +1,14 @@
+{
+  "name": "gps-web",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "PORT=3001 react-scripts start"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "cesium": "^1.102.0",
+    "resium": "^1.17.3",
+    "react-scripts": "5.0.1"
+  }
+}
