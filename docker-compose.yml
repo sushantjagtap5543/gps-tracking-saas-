@@ -1,87 +1,64 @@
-
-### docker-compose.yml (Full Stack from file:28 + Corrections)
-```yaml
 version: '3.8'
 services:
-  postgres-db:
-    image: postgres:15-alpine
-    container_name: gps-postgres
-    restart: always
+  postgres:
+    image: postgis/postgis:15-3.4-alpine
     environment:
       POSTGRES_DB: gpstracking
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: gpsuser
+      POSTGRES_PASSWORD: securepass123
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docs/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d gpstracking"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "pg_isready -U gpsuser"]
+      interval: 10s
+      timeout: 5s
       retries: 5
 
-  redis-cache:
+  redis:
     image: redis:7-alpine
-    container_name: gps-redis
-    restart: always
-    command: redis-server --requirepass ${REDISPASSWORD} --appendonly yes
-    ports:
-      - "6379:6379"
+    command: redis-server --requirepass redispass123
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDISPASSWORD}", "ping"]
-      interval: 30s
+      test: ["CMD", "redis-cli", "-a", "redispass123", "ping"]
+      interval: 10s
 
   tcp-server:
     build: ./tcp-server
-    container_name: gps-tcp
-    restart: always
-    environment:
-      DB_HOST: postgres-db
-      DB_PORT: 5432
-      DB_NAME: gpstracking
-      DB_USER: postgres
-      DB_PASSWORD: ${DB_PASSWORD}
-      REDIS_HOST: redis-cache
-      REDIS_PORT: 6379
-      REDISPASSWORD: ${REDISPASSWORD}
-      TCP_PORT: 5001
     ports:
       - "5001:5001"
-    depends_on:
-      postgres-db:
-        condition: service_healthy
-      redis-cache:
-        condition: service_healthy
-
-  backend-api:
-    build: ./backend
-    container_name: gps-api
-    restart: always
     environment:
       NODE_ENV: production
-      DB_HOST: postgres-db
-      DB_PORT: 5432
-      DB_NAME: gpstracking
-      DB_USER: postgres
-      DB_PASSWORD: ${DB_PASSWORD}
-      REDIS_HOST: redis-cache
-      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+
+  backend:
+    build: ./backend
     ports:
       - "3000:3000"
-    depends_on:
-      - tcp-server
-
-  web-frontend:
-    build: ./web-frontend
-    container_name: gps-web
-    restart: always
     environment:
-      REACT_APP_API_URL: http://localhost:3000
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+
+  web-admin:
+    build: ./web-admin
     ports:
-      - "3001:3000"
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: always
 
 volumes:
   postgres_data:
