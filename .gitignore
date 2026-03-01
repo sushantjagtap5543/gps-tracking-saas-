@@ -1,8 +1,9 @@
-node_modules
+node_modules/
 .env
-build/
-dist/
 *.log
+backups/
+.nyc_output
+coverage/
+dist/
+build/
 .DS_Store
-android-app/.gradle
-android-app/app/build
