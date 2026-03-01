@@ -1,68 +1,88 @@
+
+### docker-compose.yml (Full Stack from file:28 + Corrections)
+```yaml
 version: '3.8'
 services:
-  postgres:
-    image: postgres:15
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: gps-postgres
+    restart: always
     environment:
-      POSTGRES_DB: gps_db
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: gpstracking
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5432:5432" # Internal only, remove for prod
+      - "5432:5432"
     volumes:
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-  redis:
-    image: redis:7
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gpstracking"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis-cache:
+    image: redis:7-alpine
+    container_name: gps-redis
+    restart: always
+    command: redis-server --requirepass ${REDISPASSWORD} --appendonly yes
     ports:
-      - "6379:6379" # Internal only
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDISPASSWORD}", "ping"]
+      interval: 30s
+
   tcp-server:
     build: ./tcp-server
+    container_name: gps-tcp
+    restart: always
+    environment:
+      DB_HOST: postgres-db
+      DB_PORT: 5432
+      DB_NAME: gpstracking
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis-cache
+      REDIS_PORT: 6379
+      REDISPASSWORD: ${REDISPASSWORD}
+      TCP_PORT: 5001
     ports:
-      - "5023:5023"
+      - "5001:5001"
     depends_on:
-      - postgres
-      - redis
-    env_file: .env
-  backend:
+      postgres-db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+
+  backend-api:
     build: ./backend
+    container_name: gps-api
+    restart: always
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres-db
+      DB_PORT: 5432
+      DB_NAME: gpstracking
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis-cache
+      JWT_SECRET: ${JWT_SECRET}
     ports:
-      - "5024:3000"
+      - "3000:3000"
     depends_on:
-      - postgres
-      - redis
-    env_file: .env
+      - tcp-server
+
   web-frontend:
     build: ./web-frontend
+    container_name: gps-web
+    restart: always
+    environment:
+      REACT_APP_API_URL: http://localhost:3000
     ports:
-      - "5025:3001"
-    env_file: .env
-  nginx:
-    image: nginx
-    volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf
-    ports:
-      - "80:80"
-      - "443:443"
-      - "5026:5026" # Optional unified
-    depends_on:
-      - backend
-      - web-frontend
-  prometheus:
-    image: prom/prometheus
-    ports:
-      - "5027:9090"
-  grafana:
-    image: grafana/grafana
-    ports:
-      - "5028:3000"
-  adminer:
-    image: adminer
-    ports:
-      - "5029:8080"
-    depends_on:
-      - postgres
-  portainer:
-    image: portainer/portainer-ce
-    ports:
-      - "5030:9000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - "3001:3000"
+
+volumes:
+  postgres_data:
+  redis_data:
