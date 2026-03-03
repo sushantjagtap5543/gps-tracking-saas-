@@ -1,9 +1,0 @@
-node_modules/
-.env
-*.log
-backups/
-.nyc_output
-coverage/
-dist/
-build/
-.DS_Store
