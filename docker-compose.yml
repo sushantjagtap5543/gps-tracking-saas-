@@ -1,6 +1,5 @@
-version: "3.8"
-
 services:
+
   # -----------------------------
   # PostgreSQL
   # -----------------------------
@@ -10,14 +9,14 @@ services:
     env_file:
       - .env
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,7 +48,6 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
     container_name: gps-backend
     env_file:
       - .env
@@ -70,7 +68,6 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
     container_name: gps-frontend
     env_file:
       - .env
@@ -78,24 +75,6 @@ services:
       - backend
     ports:
       - "3000:3000"
-    networks:
-      - gps-network
-    restart: unless-stopped
-
-  # -----------------------------
-  # Admin Portal
-  # -----------------------------
-  admin:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.admin
-    container_name: gps-admin
-    env_file:
-      - .env
-    depends_on:
-      - backend
-    ports:
-      - "3001:3001"
     networks:
       - gps-network
     restart: unless-stopped
@@ -114,7 +93,6 @@ services:
     depends_on:
       - backend
       - frontend
-      - admin
     networks:
       - gps-network
     restart: unless-stopped
